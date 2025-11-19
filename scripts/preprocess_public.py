@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Iterator, List
 
 import datasets as hf_datasets
-from datasets.exceptions import DatasetNotFoundError
+from datasets import DatasetNotFoundError
 import pyarrow as pa
 import pyarrow.parquet as pq
 
