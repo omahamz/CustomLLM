@@ -1,0 +1,30 @@
+model:
+  vocab_size: 65536
+  hidden_size: 3072
+  intermediate_size: 8192
+  num_attention_heads: 16
+  num_layers: 24
+  dropout: 0.0
+  rms_norm_eps: 1.0e-05
+  max_position_embeddings: 8192
+  rotary_pct: 0.25
+  rope_theta: 10000.0
+  gradient_checkpointing: true
+
+training:
+  dataset_paths:
+    - data/public/processed/example/shard-00001.parquet
+  tokenizer_path: artifacts/tokenizer/tokenizer.model
+  seq_length: 2048
+  batch_size: 2
+  num_steps: 1000
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  warmup_steps: 100
+  log_every: 10
+  save_every: 100
+  output_dir: artifacts/checkpoints
+  mixed_precision: bf16
+  gradient_checkpointing: true
+  max_grad_norm: 1.0
+  resume_from: null
