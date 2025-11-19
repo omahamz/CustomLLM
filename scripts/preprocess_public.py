@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Iterator, List
 
 import datasets as hf_datasets
+from datasets.exceptions import DatasetNotFoundError
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -68,7 +69,24 @@ class DatasetSpec:
 
 
 def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
-    ds = hf_datasets.load_dataset(spec.name, split=spec.split, streaming=True)
+    """Yield examples from a Hugging Face dataset split.
+
+    Some datasets (e.g., ``bigcode/the-stack-dedup``) are gated on the Hub and
+    require authentication.  Surfacing that requirement early is more helpful
+    than the default ``datasets`` exception, so we catch it and replace it with
+    an actionable message.
+    """
+
+    try:
+        ds = hf_datasets.load_dataset(spec.name, split=spec.split, streaming=True)
+    except DatasetNotFoundError as exc:  # pragma: no cover - network side-effect
+        raise SystemExit(
+            "Failed to load dataset"
+            f" '{spec.name}:{spec.split}'. This dataset may be gated on the"
+            " Hugging Face Hub. Run `huggingface-cli login` or set the"
+            " `HF_TOKEN` environment variable before re-running the script."
+        ) from exc
+
     for example in ds:
         yield example
 
