@@ -36,6 +36,20 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 pip install accelerate datasets pyarrow sentencepiece pyyaml tqdm
 pip install InstructorEmbedding faiss-cpu numpy
 pip install pymupdf  # enables PDF ingestion (optional)
+
+# Optional
+pip install huggingface-hub
+
+# DEBUGGING
+pip install --upgrade datasets huggingface-hub
+```
+
+Verify Installations
+
+```bash
+python -c "import datasets; print('datasets version:', datasets.__version__)"
+python -c "import pyarrow; print('pyarrow version:', pyarrow.__version__)"
+python -c "import huggingface_hub; print('huggingface_hub version:', huggingface_hub.__version__)"
 ```
 
 If you are using different CUDA versions, adjust the first `pip install torch …`
