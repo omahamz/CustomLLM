@@ -1,0 +1,12 @@
+chunk_size: 800
+chunk_overlap: 120
+embedding_model: hkunlp/instructor-large
+metadata:
+  repo: private-repo
+  commit: HEAD
+vector_store:
+  top_k: 4
+  schema:
+    repo: string
+    file_path: string
+    commit: string
