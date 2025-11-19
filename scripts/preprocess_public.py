@@ -9,7 +9,14 @@ from pathlib import Path
 from typing import Dict, Iterator, List
 
 import datasets as hf_datasets
-from datasets import DatasetNotFoundError
+
+try:  # pragma: no cover - import path depends on installed version
+    from datasets.exceptions import DatasetNotFoundError
+except ImportError:  # pragma: no cover - compatibility shim
+    try:
+        from datasets import DatasetNotFoundError  # type: ignore[attr-defined]
+    except ImportError:  # pragma: no cover - extremely old versions
+        DatasetNotFoundError = RuntimeError
 import pyarrow as pa
 import pyarrow.parquet as pq
 
