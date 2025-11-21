@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List
 
 import datasets as hf_datasets
+from dotenv import load_dotenv
 
 try:  # pragma: no cover - import path depends on installed version
     from datasets.exceptions import DatasetNotFoundError
@@ -206,6 +208,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    load_dotenv()
+
+    if os.environ.get("HF_TOKEN"):
+        os.environ.setdefault("HF_HUB_TOKEN", os.environ["HF_TOKEN"])
+
     args = parse_args()
     output_root = args.output_dir
 
