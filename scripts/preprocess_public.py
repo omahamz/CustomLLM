@@ -111,6 +111,7 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
+        dataset_url = f"https://huggingface.co/datasets/{spec.name}"
         raise SystemExit(
             "Failed to load dataset"
             f" '{qualified_name}'. This dataset may be gated on the"
