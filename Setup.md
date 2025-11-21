@@ -32,19 +32,10 @@ Install the core stack referenced by the training, ingestion, and evaluation
 code.
 
 ```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install accelerate datasets pyarrow sentencepiece pyyaml tqdm
-pip install InstructorEmbedding faiss-cpu numpy
-pip install pymupdf  # enables PDF ingestion (optional)
-
-# Optional
-pip install huggingface-hub
-
-# DEBUGGING
-pip install --upgrade datasets huggingface-hub
+pip install -r requirements.txt
 ```
 
-Verify Installations
+Verify Installations (optional)
 
 ```bash
 python -c "import datasets; print('datasets version:', datasets.__version__)"

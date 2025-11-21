@@ -125,7 +125,7 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
             raise SystemExit(
                 "Failed to load dataset"
                 f" '{qualified_name}'. The datasets library raised a glob"
-                " error (often seen on Windows when `fsspec` or `datasets`
+                " error (often seen on Windows when `fsspec` or `datasets` "
                 " are outdated). Upgrade those dependencies or rerun from a"
                 " Unix-like environment such as WSL."
             ) from exc
