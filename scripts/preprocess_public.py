@@ -124,12 +124,10 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
-        dataset_url = f"https://huggingface.co/datasets/{spec.name}"
         message = (
             "Failed to download dataset metadata. This dataset may be gated on"
-            " the Hugging Face Hub. Visit "
-            f"{dataset_url} to request access, then run "
-            "`huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN` "
+            " the Hugging Face Hub. Request access from the dataset page, then"
+            " run `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN` "
             "environment variable before re-running the script."
         )
         if "403" not in str(exc):
