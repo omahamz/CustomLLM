@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List
 
 import datasets as hf_datasets
+from dotenv import load_dotenv
 
 try:  # pragma: no cover - import path depends on installed version
     from datasets.exceptions import DatasetNotFoundError
@@ -62,17 +64,30 @@ class DatasetSpec:
     name: str
     split: str
     text_field: str
+    config: str | None = None
 
     @classmethod
     def parse(cls, spec: str) -> "DatasetSpec":
-        """Parse strings of the form ``dataset:split:text``."""
-        try:
-            dataset, split, text_field = spec.split(":", maxsplit=2)
-        except ValueError as exc:  # pragma: no cover - defensive
+        """Parse dataset specs with an optional config.
+
+        Expected formats:
+        - ``dataset:split:text_field``
+        - ``dataset:config:split:text_field``
+        """
+
+        parts = spec.split(":")
+        if len(parts) == 3:
+            dataset, split, text_field = parts
+            config = None
+        elif len(parts) == 4:
+            dataset, config, split, text_field = parts
+        else:  # pragma: no cover - defensive
             raise SystemExit(
-                "Dataset specs must look like 'name:split:text_field'"
-            ) from exc
-        return cls(dataset, split, text_field)
+                "Dataset specs must look like 'name:split:text_field' or "
+                "'name:config:split:text_field'"
+            )
+
+        return cls(dataset, split, text_field, config=config)
 
 
 def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
@@ -84,12 +99,21 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
     an actionable message.
     """
 
+    load_kwargs = {"split": spec.split, "streaming": True}
+    if spec.config:
+        load_args = (spec.name, spec.config)
+    else:
+        load_args = (spec.name,)
+
     try:
-        ds = hf_datasets.load_dataset(spec.name, split=spec.split, streaming=True)
+        ds = hf_datasets.load_dataset(*load_args, **load_kwargs)
     except DatasetNotFoundError as exc:  # pragma: no cover - network side-effect
+        qualified_name = ":".join(
+            [part for part in (spec.name, spec.config, spec.split) if part]
+        )
         raise SystemExit(
             "Failed to load dataset"
-            f" '{spec.name}:{spec.split}'. This dataset may be gated on the"
+            f" '{qualified_name}'. This dataset may be gated on the"
             " Hugging Face Hub. Run `huggingface-cli login` or set the"
             " `HF_TOKEN` environment variable before re-running the script."
         ) from exc
@@ -134,7 +158,10 @@ def shard_stream(
 ) -> None:
     buffer: List[Dict] = []
     shard_idx = 0
-    dataset_dir = output_root / spec.name.replace("/", "_") / spec.split
+    dataset_name = spec.name.replace("/", "_")
+    if spec.config:
+        dataset_name = f"{dataset_name}__{spec.config}"
+    dataset_dir = output_root / dataset_name / spec.split
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
     for example in stream_dataset(spec):
@@ -160,7 +187,10 @@ def parse_args() -> argparse.Namespace:
         "--dataset",
         action="append",
         required=True,
-        help="Dataset spec formatted as 'name:split:text_field'.",
+        help=(
+            "Dataset spec formatted as 'name:split:text_field' or "
+            "'name:config:split:text_field'."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -178,12 +208,20 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    load_dotenv()
+
+    if os.environ.get("HF_TOKEN"):
+        os.environ.setdefault("HF_HUB_TOKEN", os.environ["HF_TOKEN"])
+
     args = parse_args()
     output_root = args.output_dir
 
     for raw_spec in args.dataset:
         spec = DatasetSpec.parse(raw_spec)
-        print(f"Processing {spec.name}:{spec.split} -> {output_root}")
+        qualified_name = ":".join(
+            [part for part in (spec.name, spec.config, spec.split) if part]
+        )
+        print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
         shard_stream(spec, output_root, args.shard_size)
 
     print("Done.")
