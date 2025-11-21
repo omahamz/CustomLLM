@@ -237,6 +237,14 @@ def parse_args() -> argparse.Namespace:
         default=2_000,
         help="Number of records per Parquet shard.",
     )
+    parser.add_argument(
+        "--skip-failed",
+        action="store_true",
+        help=(
+            "Continue processing remaining datasets even if one cannot be loaded. "
+            "Useful for gated or temporarily unavailable datasets."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -255,7 +263,13 @@ def main() -> None:
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
         print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
-        shard_stream(spec, output_root, args.shard_size)
+        try:
+            shard_stream(spec, output_root, args.shard_size)
+        except SystemExit as exc:
+            if args.skip_failed:
+                print(f"Skipping {qualified_name}: {exc}")
+                continue
+            raise
 
     print("Done.")
 
