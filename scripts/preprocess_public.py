@@ -141,7 +141,22 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
-        if "Invalid pattern" in str(exc) and "**" in str(exc):
+        message = str(exc)
+
+        if "BuilderConfig" in message and "not found" in message:
+            config_name = spec.config or "<unspecified>"
+            available = "unknown"
+            if "Available:" in message:
+                available = message.split("Available:", maxsplit=1)[-1].strip()
+            raise SystemExit(
+                "Failed to load dataset"
+                f" '{qualified_name}'. The requested config"
+                f" '{config_name}' does not exist. Available configs:"
+                f" {available}. Adjust the dataset spec to use one of the"
+                " listed configs or omit the config segment."
+            ) from exc
+
+        if "Invalid pattern" in message and "**" in message:
             raise SystemExit(
                 "Failed to load dataset"
                 f" '{qualified_name}'. The datasets library raised a glob"
