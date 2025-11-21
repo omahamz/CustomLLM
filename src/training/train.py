@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -16,6 +17,10 @@ from accelerate import Accelerator
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from configs.model.base import TransformerConfig
 from src.modeling.modeling_custom import CustomTransformer
