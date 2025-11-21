@@ -1,0 +1,23 @@
+model_config: configs/model/cpu_medium.yaml
+training:
+  dataset_paths:
+    - data/public/processed/example/shard-00001.parquet
+  tokenizer_path: artifacts/tokenizer/tokenizer.model
+  seq_length: 1024
+  batch_size: 1
+  auto_scale_batch_size: true
+  memory_safety_margin: 0.65
+  num_steps: 20000
+  learning_rate: 0.00025
+  weight_decay: 0.01
+  warmup_steps: 500
+  log_every: 10
+  save_every: 1000
+  max_checkpoints: 2
+  output_dir: artifacts/checkpoints/cpu_medium
+  mixed_precision: "no"
+  gradient_checkpointing: true
+  max_grad_norm: 1.0
+  resume_from: null
+  num_workers: 0
+  progress_window: 50

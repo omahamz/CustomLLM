@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
+import torch.quantization
 
 from configs.model.base import ModelIOConfig, TransformerConfig
 
@@ -178,3 +179,11 @@ class CustomTransformer(nn.Module):
                 next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
                 input_ids = torch.cat([input_ids, next_token], dim=1)
         return input_ids
+
+    def quantize_for_cpu(self, dtype: torch.dtype = torch.qint8) -> "CustomTransformer":
+        """Return a dynamically-quantized copy tailored for CPU-only inference."""
+
+        quantized = torch.quantization.quantize_dynamic(
+            self, {nn.Linear}, dtype=dtype, inplace=False
+        )
+        return quantized
