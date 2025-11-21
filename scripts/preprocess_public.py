@@ -114,9 +114,28 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         raise SystemExit(
             "Failed to load dataset"
             f" '{qualified_name}'. This dataset may be gated on the"
-            " Hugging Face Hub. Run `huggingface-cli login` or set the"
-            " `HF_TOKEN` environment variable before re-running the script."
+            " Hugging Face Hub. Request access from the dataset's"
+            " Hugging Face page, then run"
+            " `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN`"
+            " environment variable before re-running the script."
         ) from exc
+    except ConnectionError as exc:  # pragma: no cover - network side-effect
+        qualified_name = ":".join(
+            [part for part in (spec.name, spec.config, spec.split) if part]
+        )
+        message = (
+            "Failed to download dataset metadata. This dataset may be gated on"
+            " the Hugging Face Hub. Request access from the dataset page, then"
+            " run `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN` "
+            "environment variable before re-running the script."
+        )
+        if "403" not in str(exc):
+            message = (
+                "Failed to download dataset metadata due to a network error. "
+                "Check your internet connection and Hugging Face credentials "
+                "before re-running the script."
+            )
+        raise SystemExit(f"{message} ({qualified_name}).") from exc
     except ValueError as exc:  # pragma: no cover - defensive
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
