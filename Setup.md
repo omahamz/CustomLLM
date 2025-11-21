@@ -5,9 +5,36 @@ launch training + retrieval pipelines on personal computers without requiring a
 GPU. The defaults prioritize CPU stability and memory efficiency; GPU runs will
 still work but are no longer required.
 
+## Windows setup with WSL
+
+If you are on Windows, use Windows Subsystem for Linux (WSL) so the dataset
+streaming and preprocessing scripts behave like a Linux host. Run these steps
+from an elevated PowerShell window:
+
+1. Enable WSL with the default Ubuntu distribution and reboot if prompted:
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+2. Open the newly installed **Ubuntu** app, create your Linux user, and update
+   the base packages:
+
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install -y python3 python3-venv python3-pip git build-essential
+   ```
+
+3. Work entirely inside the Ubuntu shell for the rest of this guide. You can
+   access your Windows filesystem at `/mnt/c/...` if needed, but cloning the
+   repo into your Linux home directory (e.g., `~/CustomLLM`) avoids path quirks.
+   All commands below assume you are in the Ubuntu/WSL terminal.
+
 ## 1. Prerequisites
 
-- **OS**: Linux or macOS with Python 3.10+ and Git installed.
+- **OS**: Linux or macOS with Python 3.10+ and Git installed. Windows users
+  should install [Windows Subsystem for Linux (WSL)](#windows-setup-with-wsl)
+  and run all commands from the Linux shell.
 - **CPU**: Modern x86_64/ARM64 with AVX2 (or newer) and multiple cores for
   parallel data loading. BLAS/MKL-optimized PyTorch wheels are preferred.
 - **System RAM** (rough guidance for end-to-end training, including activations
