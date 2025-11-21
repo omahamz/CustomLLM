@@ -8,11 +8,13 @@ torchaudio==2.4.1
 accelerate==0.27.2
 datasets==2.16.1
 pyarrow==14.0.2
-sentencepiece==0.1.99
+# Use a release with prebuilt wheels for Python 3.12 to avoid cmake/pkg-config builds
+sentencepiece==0.2.0
 pyyaml==6.0.1
 tqdm==4.66.2
 InstructorEmbedding==1.0.1
-faiss-cpu==1.7.4
+# Pin to first available release in PyPI listing to avoid missing wheel errors on WSL
+faiss-cpu==1.8.0
 numpy==1.26.4
 pymupdf==1.23.8
 huggingface-hub==0.20.2
