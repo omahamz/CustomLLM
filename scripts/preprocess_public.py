@@ -115,8 +115,8 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         raise SystemExit(
             "Failed to load dataset"
             f" '{qualified_name}'. This dataset may be gated on the"
-            " Hugging Face Hub. Visit "
-            f"{dataset_url} to request access, then run"
+            " Hugging Face Hub. Request access from the dataset's"
+            " Hugging Face page, then run"
             " `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN`"
             " environment variable before re-running the script."
         ) from exc
