@@ -11,7 +11,7 @@ pyarrow==14.0.2
 sentencepiece==0.1.99
 pyyaml==6.0.1
 tqdm==4.66.2
-InstructorEmbedding==1.0.3
+InstructorEmbedding==1.0.1
 faiss-cpu==1.7.4
 numpy==1.26.4
 pymupdf==1.23.8
