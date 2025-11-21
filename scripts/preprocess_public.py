@@ -233,13 +233,20 @@ def shard_stream(
     dataset_dir = output_root / dataset_name / spec.split
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
-    for example in stream_dataset(spec):
-        processed = process_example(example, spec.text_field)
-        buffer.append(processed)
-        if len(buffer) >= shard_size:
+    try:
+        for example in stream_dataset(spec):
+            processed = process_example(example, spec.text_field)
+            buffer.append(processed)
+            if len(buffer) >= shard_size:
+                shard_idx += 1
+                write_shard(buffer, dataset_dir, shard_idx)
+                buffer.clear()
+    except KeyboardInterrupt:
+        print("Interrupted while streaming data; flushing buffered records before exiting...")
+        if buffer:
             shard_idx += 1
             write_shard(buffer, dataset_dir, shard_idx)
-            buffer.clear()
+        raise
 
     if buffer:
         shard_idx += 1
@@ -293,19 +300,23 @@ def main() -> None:
     args = parse_args()
     output_root = args.output_dir
 
-    for raw_spec in args.dataset:
-        spec = DatasetSpec.parse(raw_spec)
-        qualified_name = ":".join(
-            [part for part in (spec.name, spec.config, spec.split) if part]
-        )
-        print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
-        try:
-            shard_stream(spec, output_root, args.shard_size)
-        except SystemExit as exc:
-            if args.skip_failed:
-                print(f"Skipping {qualified_name}: {exc}")
-                continue
-            raise
+    try:
+        for raw_spec in args.dataset:
+            spec = DatasetSpec.parse(raw_spec)
+            qualified_name = ":".join(
+                [part for part in (spec.name, spec.config, spec.split) if part]
+            )
+            print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
+            try:
+                shard_stream(spec, output_root, args.shard_size)
+            except SystemExit as exc:
+                if args.skip_failed:
+                    print(f"Skipping {qualified_name}: {exc}")
+                    continue
+                raise
+    except KeyboardInterrupt:
+        print("Processing interrupted by user; partial shards may exist.")
+        return
 
     print("Done.")
 
