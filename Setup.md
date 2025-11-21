@@ -35,6 +35,10 @@ from an elevated PowerShell window:
 - **OS**: Linux or macOS with Python 3.10+ and Git installed. Windows users
   should install [Windows Subsystem for Linux (WSL)](#windows-setup-with-wsl)
   and run all commands from the Linux shell.
+  To enter Linux shell, Ctrl + D to exit:
+  ```powershell
+  Wsl -d Ubuntu
+  ```
 - **CPU**: Modern x86_64/ARM64 with AVX2 (or newer) and multiple cores for
   parallel data loading. BLAS/MKL-optimized PyTorch wheels are preferred.
 - **System RAM** (rough guidance for end-to-end training, including activations
@@ -47,11 +51,11 @@ from an elevated PowerShell window:
 
 Typical wall-clock expectations on 8–16 core CPUs:
 
-| Model size | Batch size | Seq length | Steps | Expected time (CPU) |
-|------------|------------|------------|-------|---------------------|
-| Tiny (~10M)| 4          | 512        | 5k    | ~8–12 hours         |
-| Small (~50M)| 2         | 512        | 10k   | ~1–2 days           |
-| Medium (~100M)| 1       | 1024       | 20k   | ~4–7 days           |
+| Model size     | Batch size | Seq length | Steps | Expected time (CPU) |
+| -------------- | ---------- | ---------- | ----- | ------------------- |
+| Tiny (~10M)    | 4          | 512        | 5k    | ~8–12 hours         |
+| Small (~50M)   | 2          | 512        | 10k   | ~1–2 days           |
+| Medium (~100M) | 1          | 1024       | 20k   | ~4–7 days           |
 
 Use these numbers as directional estimates; I/O speed and CPU clocks can shift
 results substantially.
@@ -95,11 +99,7 @@ and emits sharded Parquet files consumed by the CPU training loop. Keep shard
 sizes modest (1–2k rows) to reduce peak memory during preprocessing.
 
 ```bash
-python scripts/preprocess_public.py \
-  --dataset bigcode/the-stack-dedup:v1:train:content \
-  --dataset openwebtext:train:text \
-  --output-dir data/public/processed \
-  --shard-size 2000
+python scripts/preprocess_public.py --dataset bigcode/the-stack-dedup:v1:train:content --dataset openwebtext:train:text --output-dir data/public/processed --shard-size 2000
 ```
 
 Update the `--dataset` arguments to point at the corpora you are licensed to
@@ -138,6 +138,7 @@ accelerate launch src/training/train.py --config configs/training/cpu_tiny.yaml
 ```
 
 The training script will:
+
 - Auto-detect CPU and disable GPU-only code paths.
 - Downscale batch size if available RAM is limited.
 - Stream Parquet shards from disk to avoid loading the full dataset in memory.
