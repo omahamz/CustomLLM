@@ -90,7 +90,12 @@ def resolve_model_config(cfg: Dict, config_path: Path) -> Dict:
     model_path = cfg.get("model_config")
     if not model_path:
         raise ValueError("Config must contain either a 'model' block or 'model_config' path.")
-    path = (config_path.parent / Path(model_path)).resolve()
+    model_path = Path(model_path)
+    if model_path.is_absolute():
+        path = model_path
+    else:
+        local_path = (config_path.parent / model_path).resolve()
+        path = local_path if local_path.exists() else (REPO_ROOT / model_path)
     return load_yaml(path)
 
 
