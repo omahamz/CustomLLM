@@ -100,13 +100,13 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
     """
 
     load_kwargs = {"split": spec.split, "streaming": True}
-    if spec.config:
-        load_args = (spec.name, spec.config)
-    else:
-        load_args = (spec.name,)
+
+    def _load_dataset(load_spec: DatasetSpec) -> hf_datasets.IterableDataset:
+        load_args = (load_spec.name, load_spec.config) if load_spec.config else (load_spec.name,)
+        return hf_datasets.load_dataset(*load_args, **load_kwargs)
 
     try:
-        ds = hf_datasets.load_dataset(*load_args, **load_kwargs)
+        ds = _load_dataset(spec)
     except DatasetNotFoundError as exc:  # pragma: no cover - network side-effect
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
@@ -141,7 +141,43 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
-        if "Invalid pattern" in str(exc) and "**" in str(exc):
+        message = str(exc)
+
+        if "BuilderConfig" in message and "not found" in message:
+            config_name = spec.config or "<unspecified>"
+            available = "unknown"
+            available_list: List[str] | None = None
+            try:
+                available_list = hf_datasets.get_dataset_config_names(spec.name)
+                available = ", ".join(available_list)
+            except Exception:
+                if "Available:" in message:
+                    available = message.split("Available:", maxsplit=1)[-1].strip()
+
+            if spec.config and available_list and len(available_list) == 1:
+                fallback_config = available_list[0]
+                print(
+                    "Requested config",
+                    f"'{config_name}' for dataset '{spec.name}' was not found.",
+                    f"Retrying with available config '{fallback_config}'.",
+                )
+                retry_spec = DatasetSpec(
+                    name=spec.name,
+                    split=spec.split,
+                    text_field=spec.text_field,
+                    config=fallback_config,
+                )
+                return _load_dataset(retry_spec)
+
+            raise SystemExit(
+                "Failed to load dataset"
+                f" '{qualified_name}'. The requested config"
+                f" '{config_name}' does not exist. Available configs:"
+                f" {available}. Adjust the dataset spec to use one of the"
+                " listed configs or omit the config segment."
+            ) from exc
+
+        if "Invalid pattern" in message and "**" in message:
             raise SystemExit(
                 "Failed to load dataset"
                 f" '{qualified_name}'. The datasets library raised a glob"
@@ -197,13 +233,20 @@ def shard_stream(
     dataset_dir = output_root / dataset_name / spec.split
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
-    for example in stream_dataset(spec):
-        processed = process_example(example, spec.text_field)
-        buffer.append(processed)
-        if len(buffer) >= shard_size:
+    try:
+        for example in stream_dataset(spec):
+            processed = process_example(example, spec.text_field)
+            buffer.append(processed)
+            if len(buffer) >= shard_size:
+                shard_idx += 1
+                write_shard(buffer, dataset_dir, shard_idx)
+                buffer.clear()
+    except KeyboardInterrupt:
+        print("Interrupted while streaming data; flushing buffered records before exiting...")
+        if buffer:
             shard_idx += 1
             write_shard(buffer, dataset_dir, shard_idx)
-            buffer.clear()
+        raise
 
     if buffer:
         shard_idx += 1
@@ -257,19 +300,23 @@ def main() -> None:
     args = parse_args()
     output_root = args.output_dir
 
-    for raw_spec in args.dataset:
-        spec = DatasetSpec.parse(raw_spec)
-        qualified_name = ":".join(
-            [part for part in (spec.name, spec.config, spec.split) if part]
-        )
-        print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
-        try:
-            shard_stream(spec, output_root, args.shard_size)
-        except SystemExit as exc:
-            if args.skip_failed:
-                print(f"Skipping {qualified_name}: {exc}")
-                continue
-            raise
+    try:
+        for raw_spec in args.dataset:
+            spec = DatasetSpec.parse(raw_spec)
+            qualified_name = ":".join(
+                [part for part in (spec.name, spec.config, spec.split) if part]
+            )
+            print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
+            try:
+                shard_stream(spec, output_root, args.shard_size)
+            except SystemExit as exc:
+                if args.skip_failed:
+                    print(f"Skipping {qualified_name}: {exc}")
+                    continue
+                raise
+    except KeyboardInterrupt:
+        print("Processing interrupted by user; partial shards may exist.")
+        return
 
     print("Done.")
 
