@@ -114,9 +114,28 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
         raise SystemExit(
             "Failed to load dataset"
             f" '{qualified_name}'. This dataset may be gated on the"
-            " Hugging Face Hub. Run `huggingface-cli login` or set the"
-            " `HF_TOKEN` environment variable before re-running the script."
+            " Hugging Face Hub. Request access from the dataset's"
+            " Hugging Face page, then run"
+            " `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN`"
+            " environment variable before re-running the script."
         ) from exc
+    except ConnectionError as exc:  # pragma: no cover - network side-effect
+        qualified_name = ":".join(
+            [part for part in (spec.name, spec.config, spec.split) if part]
+        )
+        message = (
+            "Failed to download dataset metadata. This dataset may be gated on"
+            " the Hugging Face Hub. Request access from the dataset page, then"
+            " run `huggingface-cli login` or set the `HF_TOKEN`/`HF_HUB_TOKEN` "
+            "environment variable before re-running the script."
+        )
+        if "403" not in str(exc):
+            message = (
+                "Failed to download dataset metadata due to a network error. "
+                "Check your internet connection and Hugging Face credentials "
+                "before re-running the script."
+            )
+        raise SystemExit(f"{message} ({qualified_name}).") from exc
     except ValueError as exc:  # pragma: no cover - defensive
         qualified_name = ":".join(
             [part for part in (spec.name, spec.config, spec.split) if part]
@@ -217,6 +236,14 @@ def parse_args() -> argparse.Namespace:
         default=2_000,
         help="Number of records per Parquet shard.",
     )
+    parser.add_argument(
+        "--skip-failed",
+        action="store_true",
+        help=(
+            "Continue processing remaining datasets even if one cannot be loaded. "
+            "Useful for gated or temporarily unavailable datasets."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -235,7 +262,13 @@ def main() -> None:
             [part for part in (spec.name, spec.config, spec.split) if part]
         )
         print(f"Processing {qualified_name} (field='{spec.text_field}') -> {output_root}")
-        shard_stream(spec, output_root, args.shard_size)
+        try:
+            shard_stream(spec, output_root, args.shard_size)
+        except SystemExit as exc:
+            if args.skip_failed:
+                print(f"Skipping {qualified_name}: {exc}")
+                continue
+            raise
 
     print("Done.")
 
