@@ -117,6 +117,19 @@ def stream_dataset(spec: DatasetSpec) -> Iterator[Dict]:
             " Hugging Face Hub. Run `huggingface-cli login` or set the"
             " `HF_TOKEN` environment variable before re-running the script."
         ) from exc
+    except ValueError as exc:  # pragma: no cover - defensive
+        qualified_name = ":".join(
+            [part for part in (spec.name, spec.config, spec.split) if part]
+        )
+        if "Invalid pattern" in str(exc) and "**" in str(exc):
+            raise SystemExit(
+                "Failed to load dataset"
+                f" '{qualified_name}'. The datasets library raised a glob"
+                " error (often seen on Windows when `fsspec` or `datasets`
+                " are outdated). Upgrade those dependencies or rerun from a"
+                " Unix-like environment such as WSL."
+            ) from exc
+        raise
 
     for example in ds:
         yield example
