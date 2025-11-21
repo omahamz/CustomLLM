@@ -13,3 +13,4 @@ numpy==1.24.3
 pymupdf==1.22.5
 huggingface-hub==0.16.4
 python-dotenv==1.0.1
+psutil==5.9.8

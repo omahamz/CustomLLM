@@ -1,0 +1,12 @@
+vocab_size: 32768
+hidden_size: 896
+intermediate_size: 2432
+num_attention_heads: 14
+num_layers: 16
+dropout: 0.0
+rms_norm_eps: 1.0e-05
+max_position_embeddings: 4096
+rotary_pct: 0.25
+rope_theta: 10000.0
+gradient_checkpointing: true
+dtype: float32

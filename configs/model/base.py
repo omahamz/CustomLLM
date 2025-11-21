@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+import torch
 
 
 @dataclass
@@ -17,6 +20,15 @@ class TransformerConfig:
     rotary_pct: float = 0.25
     rope_theta: float = 10_000.0
     gradient_checkpointing: bool = False
+    dtype: Literal["float16", "bfloat16", "float32"] = "float32"
+
+    def torch_dtype(self) -> torch.dtype:
+        mapping = {
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float32": torch.float32,
+        }
+        return mapping.get(self.dtype, torch.float32)
 
 
 @dataclass

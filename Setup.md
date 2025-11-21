@@ -1,15 +1,33 @@
-# Project Setup Guide
+# CPU-First Project Setup Guide
 
 Use this guide to reproduce the CustomLLM environment, preprocess data, and
-launch the training + retrieval pipelines defined in `src/`.
+launch training + retrieval pipelines on personal computers without requiring a
+GPU. The defaults prioritize CPU stability and memory efficiency; GPU runs will
+still work but are no longer required.
 
 ## 1. Prerequisites
 
 - **OS**: Linux or macOS with Python 3.10+ and Git installed.
-- **Hardware**: NVIDIA GPU with at least 40 GB VRAM (A100 80GB recommended) for
-  full-size training. CPU-only runs are supported for unit tests and dry runs.
-- **CUDA/cuDNN**: Install drivers compatible with the PyTorch build you plan to
-  use (see [pytorch.org](https://pytorch.org/get-started/locally/)).
+- **CPU**: Modern x86_64/ARM64 with AVX2 (or newer) and multiple cores for
+  parallel data loading. BLAS/MKL-optimized PyTorch wheels are preferred.
+- **System RAM** (rough guidance for end-to-end training, including activations
+  and dataloader buffers):
+  - Tiny (~10M params): **4-8 GB RAM**
+  - Small (~50M params): **8-16 GB RAM**
+  - Medium (~100M params): **16-32 GB RAM**
+- **Disk**: 30-100 GB free for datasets, checkpoints, and tokenizer artifacts.
+- **GPU**: Optional. Everything runs on CPU by default.
+
+Typical wall-clock expectations on 8–16 core CPUs:
+
+| Model size | Batch size | Seq length | Steps | Expected time (CPU) |
+|------------|------------|------------|-------|---------------------|
+| Tiny (~10M)| 4          | 512        | 5k    | ~8–12 hours         |
+| Small (~50M)| 2         | 512        | 10k   | ~1–2 days           |
+| Medium (~100M)| 1       | 1024       | 20k   | ~4–7 days           |
+
+Use these numbers as directional estimates; I/O speed and CPU clocks can shift
+results substantially.
 
 ## 2. Clone the repository
 
@@ -29,13 +47,13 @@ python -m pip install --upgrade pip
 ## 4. Install Python dependencies
 
 Install the core stack referenced by the training, ingestion, and evaluation
-code.
+code. CPU wheels are sufficient; no CUDA toolkit is needed.
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Verify Installations (optional)
+Verify installations (optional):
 
 ```bash
 python -c "import datasets; print('datasets version:', datasets.__version__)"
@@ -43,16 +61,18 @@ python -c "import pyarrow; print('pyarrow version:', pyarrow.__version__)"
 python -c "import huggingface_hub; print('huggingface_hub version:', huggingface_hub.__version__)"
 ```
 
-If you are using different CUDA versions, adjust the first `pip install torch …`
-command accordingly.
-
 ## 5. Preprocess public datasets
 
 The preprocessing script streams Hugging Face datasets, normalizes whitespace,
-and emits sharded Parquet files consumed by training.
+and emits sharded Parquet files consumed by the CPU training loop. Keep shard
+sizes modest (1–2k rows) to reduce peak memory during preprocessing.
 
 ```bash
-python scripts/preprocess_public.py --dataset bigcode/the-stack-dedup:v1:train:content --dataset openwebtext:train:text --output-dir data/public/processed --shard-size 2000
+python scripts/preprocess_public.py \
+  --dataset bigcode/the-stack-dedup:v1:train:content \
+  --dataset openwebtext:train:text \
+  --output-dir data/public/processed \
+  --shard-size 2000
 ```
 
 Update the `--dataset` arguments to point at the corpora you are licensed to
@@ -66,30 +86,64 @@ writes `tokenizer.model`, `tokenizer.vocab`, and metadata to
 `artifacts/tokenizer/`.
 
 ```bash
-python src/tokenization/train_tokenizer.py --input data/public/processed --vocab-size 65536 --output-dir artifacts/tokenizer
+python src/tokenization/train_tokenizer.py \
+  --input data/public/processed \
+  --vocab-size 32768 \
+  --output-dir artifacts/tokenizer
 ```
 
 Point `--input` to either a directory of Parquet shards or raw `.txt` / `.jsonl`
-files.
+files. Smaller vocabularies (16–32k) reduce memory pressure for CPU runs.
 
-## 7. Configure and launch pretraining
+## 7. Configure and launch CPU-first pretraining
 
-Edit `configs/training/base.yaml` to reference the tokenizer artifact and the
-processed shards you produced. Then launch the Accelerate-powered training loop:
+Choose a CPU-friendly model preset from `configs/model/` and reference it from a
+training config in `configs/training/`:
+
+- `configs/model/cpu_tiny.yaml` – ~10M params, fits in 4–8 GB RAM
+- `configs/model/cpu_small.yaml` – ~50M params, fits in 8–16 GB RAM
+- `configs/model/cpu_medium.yaml` – ~100M params, fits in 16–32 GB RAM
+
+Example training launch for the tiny preset:
 
 ```bash
-accelerate config  # run once to define your hardware topology
-accelerate launch src/training/train.py --config configs/training/base.yaml
+accelerate launch src/training/train.py --config configs/training/cpu_tiny.yaml
 ```
 
-Checkpoints are written under `artifacts/checkpoints/step-XXXX/` and the final
-state saves to `artifacts/checkpoints/final/`.
+The training script will:
+- Auto-detect CPU and disable GPU-only code paths.
+- Downscale batch size if available RAM is limited.
+- Stream Parquet shards from disk to avoid loading the full dataset in memory.
+- Apply gradient checkpointing and mixed precision only when compatible.
 
-## 8. Ingest private documents for RAG
+Checkpoints are written under `artifacts/checkpoints/step-XXXX/` and rotated to
+respect CPU RAM limits.
 
-Use the ingestion pipeline to chunk private Markdown/HTML/PDF docs, compute
-embeddings, and push them into the in-memory vector store. Replace the sample
-paths with your own locations.
+## 8. Manage system resources during long CPU runs
+
+- Close browsers and heavy apps to free memory before starting training.
+- Monitor memory usage in the logs; the trainer will warn near OOM thresholds.
+- Prefer SSDs over HDDs to keep streaming I/O responsive.
+- Pin batch sizes to 1–4 on 8 GB machines; increase gradually after observing
+  stable memory usage.
+- If training slows due to swapping, lower `training.batch_size` or shorten
+  `training.seq_length`.
+
+## 9. Troubleshooting CPU training
+
+- **RuntimeError: out of memory**: Reduce `training.batch_size`, lower
+  `training.seq_length`, or switch to the `cpu_tiny` model preset.
+- **Slow dataloading**: Lower `training.num_workers` to `0` or `1` to avoid
+  contention, and store shards on SSDs.
+- **bf16/float16 not supported**: Set `training.mixed_precision: "no"` and keep
+  `dtype: float32` in the model configuration.
+- **Checkpoints too large**: Increase `training.max_checkpoints` pruning or
+  switch to the tiny preset to shrink state size.
+
+## 10. Ingest private documents for RAG (optional)
+
+CPU-friendly ingestion and retrieval continue to work. Replace the sample paths
+with your own locations.
 
 ```python
 from pathlib import Path
@@ -101,26 +155,7 @@ pipeline.ingest_path(Path("/path/to/private/docs"))
 pipeline.dump_index(Path("artifacts/vector_store.json"))
 ```
 
-## 9. Run the RAG chatbot
-
-Instantiate the chatbot with the populated vector store and embedding model.
-The default `EchoGenerator` simply returns the prompt tail; swap it with your
-fine-tuned model wrapper for real answers.
-
-```python
-from src.rag.chatbot import RAGChatbot
-from src.rag.embeddings import EmbeddingModel
-from src.rag.vector_store import VectorStore
-
-vector_store = VectorStore(dim=768)
-embedding_model = EmbeddingModel()
-chatbot = RAGChatbot(vector_store=vector_store, embedding_model=embedding_model)
-response = chatbot.generate_response("Summarize the private docs", top_k=4)
-print(response.answer)
-print(response.citations)
-```
-
-## 10. Run the regression tests
+## 11. Run the regression tests
 
 Execute the smoke tests to confirm ingestion and retrieval still align with the
 vector store and chatbot APIs.
@@ -129,10 +164,11 @@ vector store and chatbot APIs.
 pytest tests/rag/test_ingest_retrieval.py
 ```
 
-## 11. Next steps
+## 12. Next steps
 
-- Update `configs/model/base.py` and `configs/training/base.yaml` if you change
+- Update `configs/model/*.yaml` and `configs/training/*.yaml` when changing
   architecture or optimizer hyperparameters.
-- Explore `src/evaluation/` for benchmark harnesses (HumanEval, MBPP, doc-grounded QA).
+- Explore `src/evaluation/` for benchmark harnesses (HumanEval, MBPP,
+  doc-grounded QA).
 - Review `docs/ops/security.md` for minimum security practices when working with
   private repositories.
