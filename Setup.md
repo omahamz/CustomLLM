@@ -81,7 +81,7 @@ Install the core stack referenced by the training, ingestion, and evaluation
 code. CPU wheels are sufficient; no CUDA toolkit is needed.
 
 ```bash
-pip install -r requirements.txt
+pip install --break-system-packages -r requirements.txt
 ```
 
 Verify installations (optional):
@@ -99,7 +99,7 @@ and emits sharded Parquet files consumed by the CPU training loop. Keep shard
 sizes modest (1–2k rows) to reduce peak memory during preprocessing.
 
 ```bash
-python scripts/preprocess_public.py --dataset bigcode/the-stack-dedup:v1:train:content --dataset openwebtext:train:text --output-dir data/public/processed --shard-size 2000
+python3 scripts/preprocess_public.py --dataset bigcode/the-stack-dedup:v1:train:content --dataset openwebtext:train:text --output-dir data/public/processed --shard-size 2000
 ```
 
 Update the `--dataset` arguments to point at the corpora you are licensed to
@@ -113,10 +113,7 @@ writes `tokenizer.model`, `tokenizer.vocab`, and metadata to
 `artifacts/tokenizer/`.
 
 ```bash
-python src/tokenization/train_tokenizer.py \
-  --input data/public/processed \
-  --vocab-size 32768 \
-  --output-dir artifacts/tokenizer
+python src/tokenization/train_tokenizer.py --input data/public/processed --vocab-size 32768 --output-dir artifacts/tokenizer
 ```
 
 Point `--input` to either a directory of Parquet shards or raw `.txt` / `.jsonl`
@@ -135,6 +132,13 @@ Example training launch for the tiny preset:
 
 ```bash
 accelerate launch src/training/train.py --config configs/training/cpu_tiny.yaml
+```
+
+If above does not work, it could be that accelerate is NOT in PATH, run:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 The training script will:
