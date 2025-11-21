@@ -5,14 +5,15 @@ training:
   tokenizer_path: artifacts/tokenizer/tokenizer.model
   seq_length: 512
   batch_size: 4
+  stream_batch_size: 256
   auto_scale_batch_size: true
   memory_safety_margin: 0.65
-  num_steps: 5000
-  learning_rate: 0.0006
+  num_steps: 1000
+  learning_rate: 0.0005
   weight_decay: 0.01
-  warmup_steps: 100
+  warmup_steps: 50
   log_every: 10
-  save_every: 500
+  save_every: 200
   max_checkpoints: 3
   output_dir: artifacts/checkpoints/cpu_tiny
   mixed_precision: "no"
@@ -21,3 +22,4 @@ training:
   resume_from: null
   num_workers: 0
   progress_window: 25
+  cpu_threads: 4
