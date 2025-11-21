@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -16,6 +17,10 @@ from accelerate import Accelerator
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from configs.model.base import TransformerConfig
 from src.modeling.modeling_custom import CustomTransformer
@@ -80,12 +85,33 @@ def load_yaml(path: Path) -> Dict:
 
 
 def resolve_model_config(cfg: Dict, config_path: Path) -> Dict:
-    if cfg.get("model"):
-        return cfg["model"]
-    model_path = cfg.get("model_config")
+    if not isinstance(cfg, dict):
+        raise ValueError("Config file must be a mapping with training and model settings.")
+
+    # Prefer an inline model block if present (useful for quick experiments).
+    inline_model = cfg.get("model") or cfg.get("config", {}).get("model")
+    if inline_model:
+        return inline_model
+
+    # Otherwise look for a referenced model config path in common locations.
+    model_path = (
+        cfg.get("model_config")
+        or cfg.get("config", {}).get("model_config")
+        or cfg.get("model-config")
+    )
     if not model_path:
-        raise ValueError("Config must contain either a 'model' block or 'model_config' path.")
-    path = (config_path.parent / Path(model_path)).resolve()
+        available = ", ".join(sorted(cfg.keys())) if isinstance(cfg, dict) else "<unknown>"
+        raise ValueError(
+            "Config must contain either a 'model' block or 'model_config' path. "
+            f"Top-level keys seen: {available}"
+        )
+
+    model_path = Path(model_path)
+    if model_path.is_absolute():
+        path = model_path
+    else:
+        local_path = (config_path.parent / model_path).resolve()
+        path = local_path if local_path.exists() else (REPO_ROOT / model_path)
     return load_yaml(path)
 
 
